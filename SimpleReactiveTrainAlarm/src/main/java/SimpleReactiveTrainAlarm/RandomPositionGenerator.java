@@ -57,7 +57,8 @@ public class RandomPositionGenerator {
 					
 					Position pos = new Position();
 					pos.shufflePosition();
-					System.out.println ("new position from " + type + ": " + pos.toString() + " - " + listeners.size() + " listeners will be informed");
+					
+					//System.out.println("new position from " + type + ": " + pos.toString() + " - " + listeners.size() + " listeners will be informed");
 					
 					for (int i=0; i<listeners.size(); i++){				
 						listeners.get(i).updatePosition(pos);
