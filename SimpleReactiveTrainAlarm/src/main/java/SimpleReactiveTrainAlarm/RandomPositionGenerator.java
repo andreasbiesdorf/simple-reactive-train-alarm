@@ -17,20 +17,6 @@ public class RandomPositionGenerator {
 		this.type = type;
 	}
 	
-	public Position getNewPosition() {	
-		
-		try {
-			TimeUnit.SECONDS.sleep(Math.round(Math.random()*5.0));
-		} catch (InterruptedException e) {
-			e.printStackTrace();
-		}
-		
-		Position pos = new Position();
-		pos.shufflePosition();
-		
-		return pos;
-	}
-	
 	public void addPositionListener (PositionUpdateListener listener) {
 		listeners.add(listener);
 	}
@@ -50,7 +36,8 @@ public class RandomPositionGenerator {
 			
 				while (true) {
 					try {
-						TimeUnit.SECONDS.sleep(Math.round(Math.random()*5.0));
+						// wait at least a second, potentially longer
+						TimeUnit.SECONDS.sleep(1 + Math.round(Math.random()*5.0));
 					} catch (InterruptedException e) {
 						e.printStackTrace();
 					}

@@ -35,10 +35,10 @@ public class SimpleReactiveTrainAlarm {
 	
 	private JTextArea logTextArea; 
 	
-	private DrawingPanel dp;
+	private DrawingPanel dp, dpMarbles;
 	
 	private Position lastPositionWorker, lastPositionTrain;
-	
+		
 	public SimpleReactiveTrainAlarm() {
 		
 		JFrame simpleUI = new JFrame("Simple Reactive Train Alarm Application");
@@ -84,7 +84,6 @@ public class SimpleReactiveTrainAlarm {
 		
 		
 		JFrame logUI = new JFrame("Reactive Train Alarm Application - Controller"); 
-		BorderLayout layoutController = new BorderLayout(2, 2);
 		logUI.setLayout(new GridLayout());
 		
 		logTextArea = new JTextArea();
@@ -96,18 +95,19 @@ public class SimpleReactiveTrainAlarm {
 		
 		JFrame visualizationUI = new JFrame("Reactive Train Alarm Application - Visualization");
 		visualizationUI.setLayout(new GridLayout(1, 1, 5, 5));
-		JLabel graphicsLabel = new JLabel();
-		graphicsLabel.setPreferredSize(new Dimension(200, 200));		
 		dp = new DrawingPanel();
 		visualizationUI.add(dp);
 		visualizationUI.setSize(400, 400);
 		visualizationUI.setVisible(true);
 		
 		
-		
-		
-
-		
+		JFrame marbleVisualizationUI = new JFrame("Reactive Train Alarm Application - Marble Diagram");
+		visualizationUI.setLayout(new GridLayout(1, 1, 5, 5));			
+		dpMarbles = new DrawingPanel();
+		marbleVisualizationUI.add(dpMarbles);
+		marbleVisualizationUI.setSize(800, 200);
+		marbleVisualizationUI.setVisible(true);
+				
 		
 		Observable<Position> trainPosition = Observable.create(new ObservableOnSubscribe<Position>() {
 
@@ -247,7 +247,7 @@ public class SimpleReactiveTrainAlarm {
 		acknowledgeWarningButton.setBorderPainted(true);;
 		
 		
-		log ("Warnung Acknowledged");		
+		log ("Warning Acknowledged");		
 	}
 	
 	public void setupWarning (JButton acknowledgeWarningButton, Double distance) {
@@ -263,7 +263,7 @@ public class SimpleReactiveTrainAlarm {
 	
 	private void log(String logText) {
 		
-		logTextArea.setText("[" + DateTimeFormatter.ofPattern("HH:mm:ss").format(LocalTime.now()) + "]: " + logText + "\n" + logTextArea.getText());
+		logTextArea.setText(logTextArea.getText() + "\n"  + "[" + DateTimeFormatter.ofPattern("HH:mm:ss").format(LocalTime.now()) + "]: " + logText );
 		
 	}
 	
@@ -278,40 +278,38 @@ public class SimpleReactiveTrainAlarm {
 		
 		if (train) {
 			
-			paintRectangle(pos, lastPositionWorker, Color.red);
+			paintRectangle(pos, lastPositionWorker, Color.red, false);
 			
 			
 			
 			if (lastPositionWorker != null)
-				paintRectangle(lastPositionWorker, lastPositionWorker, Color.blue);
+				paintRectangle(lastPositionWorker, lastPositionWorker, Color.blue, true);
 						
 			lastPositionTrain = pos;
 			
 		} else {
 			
 
-			paintRectangle(pos, lastPositionTrain, Color.blue);
+			paintRectangle(pos, lastPositionTrain, Color.blue, true);
 			
 			if (lastPositionTrain != null)
-				paintRectangle(lastPositionTrain, lastPositionTrain, Color.red);
+				paintRectangle(lastPositionTrain, lastPositionTrain, Color.red, false);
 						
 			lastPositionWorker = pos;
 						
 		}
 	}
 	
-	private void paintRectangle(Position pos, Position pos2, Color col) {
-		
+	private void paintRectangle(Position pos, Position pos2, Color col, boolean isWorker) {
+
 		Dimension d = dp.getSize();
-		
+
 		dp.getG2d().setColor(Color.black);
-		dp.getG2d().drawRect(0, 0, dp.getWidth(), dp.getHeight());
 		
 		double x= pos.getPosition().get(0);
 		double y= pos.getPosition().get(1);
 		
 		double x2=x,y2=y,x3=x,y3=y;
-		
 		
 		if (pos2 != null  ) {
 
@@ -326,15 +324,16 @@ public class SimpleReactiveTrainAlarm {
 			//System.out.println(x + " - " + y + " - " + x2 + " - " + y2 + " - " + x3 + " - " + y3);
 			
 			if (x != x2 && y != y2) {
-			dp.getG2d().drawLine((int)Math.round(x* d.width/10.0), (int)Math.round(y * d.width/10.0), (int)Math.round(x2* d.width/10.0), (int)Math.round(y2 * d.width/10.0));
+			dp.getG2d().drawLine((int)Math.round(x* d.width/10.0), (int)Math.round(y * d.height/10.0), (int)Math.round(x2* d.width/10.0), (int)Math.round(y2 * d.height/10.0));
 			
-			dp.getG2d().drawString((new DecimalFormat("#0.00")).format(distance), (int)Math.round(x3* d.width/10.0), (int)Math.round(y3 * d.width/10.0));
+			if (!isWorker) 
+			dp.getG2d().drawString((new DecimalFormat("#0.00")).format(distance), (int)Math.round(x3* d.width/10.0), (int)Math.round(y3 * d.height/10.0));
 			}
 		}
 		
 		dp.getG2d().setColor(col);
 		
-		dp.getG2d().fillRect((int)Math.round(x* d.width/10.0)-3, (int)Math.round(y * d.width/10.0)-3, 7, 7);
+		dp.getG2d().fillRect((int)Math.round(x* d.width/10.0)-3, (int)Math.round(y * d.height/10.0)-3, 7, 7);
 		
 		/*Image image;
 		try {
@@ -349,9 +348,10 @@ public class SimpleReactiveTrainAlarm {
 		double radiusX = 3.0/5.0 * d.width;
 		double radiusY = 3.0/5.0 * d.height;
 		
-		dp.getG2d().drawOval((int)Math.round(x* d.width/10.0 - radiusX/2.0), (int)Math.round(y * d.width/10.0 - radiusY/2.0), (int) Math.round(radiusX), (int) Math.round(radiusY));
 		
-		//dp.repaint((int)Math.round(x* d.width/10.0)-3, (int)Math.round(y * d.width/10.0)-3, 7, 7);
+		if (isWorker)
+			dp.getG2d().drawOval((int)Math.round(x* d.width/10.0 - radiusX/2.0), (int)Math.round(y * d.height/10.0 - radiusY/2.0), (int) Math.round(radiusX), (int) Math.round(radiusY));
+		
 		dp.repaint();
 	}
 	
