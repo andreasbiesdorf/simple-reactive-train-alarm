@@ -4,8 +4,17 @@ public class PositionAdapter implements PositionUpdateListener {
 
 	@Override
 	public void updatePosition(Position newPosition) {
-		// TODO Auto-generated method stub
 		
 	}
 
+	@Override
+	public void updatePositionError(Exception exception) {
+		
+	}
+
+	@Override
+	public void lastPosition() {
+		
+	}
+	
 }

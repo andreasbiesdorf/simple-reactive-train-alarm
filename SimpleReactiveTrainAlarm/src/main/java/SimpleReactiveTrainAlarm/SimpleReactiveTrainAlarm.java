@@ -1,19 +1,14 @@
 package SimpleReactiveTrainAlarm;
 
-import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.GridLayout;
-import java.awt.Image;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
-import java.io.File;
-import java.io.IOException;
 import java.text.DecimalFormat;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 
-import javax.imageio.ImageIO;
 import javax.swing.JButton;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
@@ -26,231 +21,248 @@ import io.reactivex.ObservableEmitter;
 import io.reactivex.ObservableOnSubscribe;
 import io.reactivex.disposables.Disposable;
 
+/**
+ * SimpleReactiveTrainAlarm ist eine einfache Applikation zur Demonstration von Konzepten zum reaktiven Programmieren
+ * 
+ * @author Andreas Biesdorf
+ * @version 1.0
+ */
 public class SimpleReactiveTrainAlarm {
 	
 	private Disposable trainPositionDisposable, workerPositionDisposable;
-	private Disposable trainDrawingDisposable, workerDrawingDisposable;
-	
-	private PositionAdapter positionAdapterWorkerPosition, positionAdapterTrainPosition;
-	
 	private JTextArea logTextArea; 
-	
-	private DrawingPanel dp, dpMarbles;
-	
+	private JButton acknowledgeWarningButton;
+	private DrawingPanel dp;
 	private Position lastPositionWorker, lastPositionTrain;
-		
+	private JTextField textFieldTrain, textFieldWorker, textFieldDistance;
+	private JButton buttonStartTrackingTrain, buttonStopTrackingTrain, buttonStartTrackingWorker, buttonStopTrackingWorker, buttonComputeDistance;
+			
 	public SimpleReactiveTrainAlarm() {
-		
-		JFrame simpleUI = new JFrame("Simple Reactive Train Alarm Application");
-		GridLayout layout = new GridLayout(3,4,2,2);
-		
-		simpleUI.setLayout(layout);
-		
-		JTextField textFieldTrain = new JTextField();
-		JButton buttonStartTrain = new JButton("Track");
-		JButton buttonStopTrain = new JButton("Untrack");
-		simpleUI.add(new JLabel("Train"));
-		simpleUI.add(textFieldTrain);
-		simpleUI.add(buttonStartTrain);
-		simpleUI.add(buttonStopTrain);
-		
 
-		JTextField textFieldWorker = new JTextField();
-		JButton buttonStartWorker = new JButton("Track");
-		JButton buttonStopWorker = new JButton("Untrack");
-		simpleUI.add(new JLabel("Worker"));
-		simpleUI.add(textFieldWorker);
-		simpleUI.add(buttonStartWorker);
-		simpleUI.add(buttonStopWorker);
+		/********
+		 * Erzeuge einfache UI zur Visualisierung der Positionen
+		 ********/		
+		JFrame visualizationUI = new JFrame("Reactive Train Alarm Application - Visualization");
+		setupVisualizationUI(visualizationUI);
+		visualizationUI.setSize(400, 400);
+		visualizationUI.setVisible(true);	
 		
-		JTextField textFieldDistance = new JTextField();
-		JButton acknowledgeWarningButton = new JButton("Acknowledge Warning");
-		JButton buttonComputeDistance = new JButton("Compute");
-		acknowledgeWarningButton.setEnabled(false);
-		simpleUI.add(new JLabel("Distance"));
-		simpleUI.add(textFieldDistance);
-		simpleUI.add(buttonComputeDistance);
-		simpleUI.add(acknowledgeWarningButton);
-
-		
-		simpleUI.setVisible(true);
-		simpleUI.setSize(500,100);
-		
-		RandomPositionGenerator rpgTrain = new RandomPositionGenerator("Train");
-		rpgTrain.startMoving();
-
-		RandomPositionGenerator rpgWorker = new RandomPositionGenerator("Worker");
-		rpgWorker.startMoving();
-		
-		
-		JFrame logUI = new JFrame("Reactive Train Alarm Application - Controller"); 
-		logUI.setLayout(new GridLayout());
-		
-		logTextArea = new JTextArea();
-		JScrollPane scrollPane = new JScrollPane(logTextArea);
-		logUI.add(scrollPane);
+		/********
+		 * Erzeuge einfache UI zur Darstellung des Log-Fensters
+		 ********/
+		JFrame logUI = new JFrame("Reactive Train Alarm Application - Controller");
+		setupLogUI(logUI);
 		logUI.setSize(600, 400);
 		logUI.setVisible(true);
 		
+		/********
+		 * Erzeuge einfache UI zur Darstellung der Werte 
+		 ********/
+		JFrame simpleUI = new JFrame("Simple Reactive Train Alarm Application");
+		setupSimpleUI(simpleUI);
+		simpleUI.setVisible(true);
+		simpleUI.setSize(500,100);
 		
-		JFrame visualizationUI = new JFrame("Reactive Train Alarm Application - Visualization");
-		visualizationUI.setLayout(new GridLayout(1, 1, 5, 5));
-		dp = new DrawingPanel();
-		visualizationUI.add(dp);
-		visualizationUI.setSize(400, 400);
-		visualizationUI.setVisible(true);
+		/********
+		 * Erzeuge Observable und Observer für die Zugposition
+		 ********/
+		// Erzeuge zufällige GPS-Positionen des Zugs 
+		TrainPositionIoTConnector trainPositionIoTConnector = new TrainPositionIoTConnector("Train");
+		trainPositionIoTConnector.startMoving();
 		
-		
-		JFrame marbleVisualizationUI = new JFrame("Reactive Train Alarm Application - Marble Diagram");
-		visualizationUI.setLayout(new GridLayout(1, 1, 5, 5));			
-		dpMarbles = new DrawingPanel();
-		marbleVisualizationUI.add(dpMarbles);
-		marbleVisualizationUI.setSize(800, 200);
-		marbleVisualizationUI.setVisible(true);
-				
-		
-		Observable<Position> trainPosition = Observable.create(new ObservableOnSubscribe<Position>() {
+		// Erzeuge ein Observable, um Subscriptions auf diese Positionsänderung zu ermöglichen
+		Observable<Position> trainPosition = Observable.create( new ObservableOnSubscribe<Position> () {
 
 			@Override
-			public void subscribe(ObservableEmitter<Position> e) throws Exception {
+			public void subscribe(ObservableEmitter<Position> emitter) throws Exception {
 				
-				positionAdapterTrainPosition = new PositionAdapter() {
+				PositionAdapter positionAdapterTrainPosition = new PositionAdapter() {
+					
 					@Override
 					public void updatePosition(Position newPosition) {
-						e.onNext(newPosition);							
+						emitter.onNext(newPosition);							
+					}
+					
+					@Override
+					public void lastPosition() {
+						emitter.onComplete();	
+					}
+
+					@Override
+					public void updatePositionError(Exception exception) {
+						emitter.onError(exception);	
 					}
 				};
 				
-				rpgTrain.addPositionListener(positionAdapterTrainPosition); 
+				trainPositionIoTConnector.addPositionListener(positionAdapterTrainPosition); 
 			}			
 		
 		});
 		
 		// Log in UI		
-		trainPosition.subscribe(e -> log("new position from Train: " + e.toString()));
-		trainDrawingDisposable = trainPosition.subscribe(e -> paintPoint(e, true));
-		
-		
-		Observable<Position> workerPosition = Observable.create(new ObservableOnSubscribe<Position>() {
+		trainPosition.subscribe (
+				(Position newTrainPosition) -> log("new position from Train: " + newTrainPosition.toString()), 
+				exception -> exception.printStackTrace()
+				);
 
-			@Override
-			public void subscribe(ObservableEmitter<Position> e) throws Exception {
-				
-				positionAdapterWorkerPosition = new PositionAdapter() {
-					@Override
-					public void updatePosition(Position newPosition) {
-						e.onNext(newPosition);							
-					}
-				};
-				
-				rpgWorker.addPositionListener(positionAdapterWorkerPosition);
-			}
-		
-		});
-		
-		// Log in UI 
-		workerPosition.subscribe(e -> log("new position from Worker: " + e.toString()));		
-		workerDrawingDisposable = workerPosition.subscribe(e -> paintPoint(e, false));
-		
-		
-		Observable<Boolean> acknowledgeAlarm = Observable.create(new ObservableOnSubscribe<Boolean>() {
+		// Aktualisiere die Visualisierung
+		trainPosition.subscribe(
+				(Position newTrainPosition) -> paintPoint(newTrainPosition, true),
+				exception -> exception.printStackTrace()
+				);	
 
-			@Override
-			public void subscribe(ObservableEmitter<Boolean> e) throws Exception {
-				
-				acknowledgeWarningButton.addActionListener ( new ActionListener() {
-					@Override
-					public void actionPerformed(ActionEvent event) {
-						e.onNext(true);
-					}
-				});	
-			}
-		});
-		
-		acknowledgeAlarm.subscribe( e -> acknowledgeAlarm(acknowledgeWarningButton)); 
-		
-		
-		
-		buttonStartTrain.addActionListener ( new ActionListener() {
-			@Override
-			public void actionPerformed(ActionEvent event) {				
-				trainPositionDisposable = trainPosition.subscribe(e -> textFieldTrain.setText(e.toString()));	
-				//trainDrawingDisposable = trainPosition.subscribe(e -> paintPoint(e, true));
-			}
-		});
-		
-		buttonStartWorker.addActionListener ( new ActionListener() {
-			@Override
-			public void actionPerformed(ActionEvent event) {				
-				workerPositionDisposable = workerPosition.subscribe(e -> textFieldWorker.setText(e.toString()));
-				//workerDrawingDisposable = workerPosition.subscribe(e -> paintPoint(e, false));
-			}
-		});	
-		
-		buttonComputeDistance.addActionListener ( new ActionListener() {
+		buttonStartTrackingTrain.addActionListener ( new ActionListener() {
 			@Override
 			public void actionPerformed(ActionEvent event) {
-								
-				// update Text field whenever a change comes in 
-				Observable.combineLatest(trainPosition, workerPosition, (x,y) -> x.distance(y)).subscribe(e -> textFieldDistance.setText((new DecimalFormat("#0.00")).format(e)));
-				
-				// issue a warning if the distance is <3.0
-				Observable.combineLatest(trainPosition, workerPosition, (x,y) -> x.distance(y)).filter(e -> e<3.0).subscribe(e -> setupWarning(acknowledgeWarningButton, e));
-				
-			}
-		});	
-		
-		acknowledgeWarningButton.addActionListener(new ActionListener() {
-			@Override
-			public void actionPerformed(ActionEvent e) {
-				acknowledgeWarningButton.setEnabled(false);
+				if(trainPositionDisposable == null || (trainPositionDisposable.isDisposed())) {
+					trainPositionDisposable = trainPosition.subscribe(e -> textFieldTrain.setText(e.toString()));
+				}
 			}
 		});
-
-		buttonStopTrain.addActionListener ( new ActionListener() {
+			
+		buttonStopTrackingTrain.addActionListener ( new ActionListener() {
 			@Override
 			public void actionPerformed(ActionEvent event) {
 				if (trainPositionDisposable != null) {
 					trainPositionDisposable.dispose();
 				}
-				if (trainDrawingDisposable != null) {
-					//trainDrawingDisposable.dispose();
-				}
-				
-				if (positionAdapterTrainPosition != null) {
-					rpgTrain.removePositionListener(positionAdapterTrainPosition);
-				}
 			}
 		});
 		
-		buttonStopWorker.addActionListener ( new ActionListener() {
+		/********
+		 * Erzeuge Observable und Observer für die Arbeiterposition
+		 ********/
+		// Erzeuge zufällige GPS-positionen des Arbeiters 
+		WorkerPositionGenerator workerPositionGenerator = new WorkerPositionGenerator("Worker");
+		workerPositionGenerator.startMoving();
+		
+		// Erzeuge ein Observable, um Subscriptions auf diese Positionsänderung zu ermöglichen
+		Observable<Position> workerPosition = Observable.create(new ObservableOnSubscribe<Position>() {
+
+			@Override
+			public void subscribe(ObservableEmitter<Position> emitter) throws Exception {
+				
+				PositionAdapter positionAdapterWorkerPosition = new PositionAdapter() {
+					@Override
+					public void updatePosition(Position newPosition) {
+						emitter.onNext(newPosition);							
+					}
+					
+					@Override
+					public void lastPosition() {
+						emitter.onComplete();	
+					}
+
+					@Override
+					public void updatePositionError(Exception exception) {
+						emitter.onError(exception);	
+					}
+				};
+				
+				workerPositionGenerator.addPositionListener(positionAdapterWorkerPosition);
+			}
+		
+		});
+		
+		// Log in UI 
+		workerPosition.subscribe(
+				(Position newWorkerPosition) -> log("new position from Worker: " + newWorkerPosition.toString()), 
+				exception -> exception.printStackTrace()
+				);
+		
+		// Aktualisiere die Visualisierung
+		workerPosition.subscribe(
+				(Position newWorkerPosition) -> paintPoint(newWorkerPosition, false),
+				exception -> exception.printStackTrace()
+				);
+		
+		buttonStartTrackingWorker.addActionListener ( new ActionListener() {
+			@Override
+			public void actionPerformed(ActionEvent event) {
+				if((workerPositionDisposable == null) || workerPositionDisposable.isDisposed()){
+					workerPositionDisposable = workerPosition.subscribe(e -> textFieldWorker.setText(e.toString()));
+				}
+			}
+		});	
+	
+		buttonStopTrackingWorker.addActionListener ( new ActionListener() {
 			@Override
 			public void actionPerformed(ActionEvent event) {
 				if (workerPositionDisposable != null) {
 					workerPositionDisposable.dispose();
 				}
-				if (workerDrawingDisposable != null) {
-					//workerDrawingDisposable.dispose();
-				}
-
-				if (positionAdapterWorkerPosition != null) {
-					rpgWorker.removePositionListener(positionAdapterWorkerPosition);
-				}
 			}
 		});	
+		
+		/********
+		 * Kombiniere mehrere Event Streams, bestimme die Abstände und subscribe einen Observer auf das Ergebnis
+		 ********/
+		
+		buttonComputeDistance.addActionListener ( new ActionListener() {
+			
+			@Override
+			public void actionPerformed(ActionEvent event) {
+
+				// update Text field whenever a change comes in 
+				Observable
+				.combineLatest(trainPosition, 
+						workerPosition, 
+						(trainPosition, workerPosition) -> trainPosition.computeEuclideanDistanceFrom(workerPosition))
+				.subscribe(distanceTrainWorker -> textFieldDistance.setText((new DecimalFormat("#0.00")).format(distanceTrainWorker)));				
+				
+				// issue a warning if the distance is <3.0
+				Observable
+				.combineLatest(trainPosition, 
+						workerPosition, (trainPosition,workerPosition) -> trainPosition.computeEuclideanDistanceFrom(workerPosition))
+				.filter(distance -> distance < 3.0)
+				.subscribe(distance -> issueWarning(distance));
+				
+			}
+		});	
+		
+		/********
+		 * Erzeuge Observable und Observer für die Alarm-Bestätigung
+		 ********/
+		
+		// Erzeuge Observable, um das Bestätigen von Alarmen zu registrieren
+		Observable<Boolean> acknowledgeAlarm = Observable.create(new ObservableOnSubscribe<Boolean>() {
+
+			@Override
+			public void subscribe(ObservableEmitter<Boolean> e) throws Exception {
+				acknowledgeWarningButton.addActionListener ( new ActionListener() {
+					@Override
+					public void actionPerformed(ActionEvent event) {						
+						e.onNext(true);
+					}
+				});
+			}
+		});
+		
+		// interne Methode um das Acknowledgement zu verarbeiten
+		acknowledgeAlarm.subscribe( isAcknowledged -> acknowledgeAlarm(isAcknowledged)); 
+
 	}
 	
-	public void acknowledgeAlarm(JButton acknowledgeWarningButton) {
-		acknowledgeWarningButton.setEnabled(false);
-		acknowledgeWarningButton.setBackground(Color.lightGray);
-		acknowledgeWarningButton.setOpaque(false);
-		acknowledgeWarningButton.setBorderPainted(true);;
-		
-		
-		log ("Warning Acknowledged");		
+	/**
+	 * Verarbeiten aller Bestätigungen des Alarms  
+	 * @param isAcknowledged true, wenn bestätigt
+	 */
+	public void acknowledgeAlarm(boolean isAcknowledged) {
+		if (isAcknowledged) {
+			acknowledgeWarningButton.setEnabled(false);
+			acknowledgeWarningButton.setBackground(Color.lightGray);
+			acknowledgeWarningButton.setOpaque(false);
+			acknowledgeWarningButton.setBorderPainted(true);;		
+			
+			log ("Warning Acknowledged");
+		}
 	}
 	
-	public void setupWarning (JButton acknowledgeWarningButton, Double distance) {
+	/**
+	 * Anzeigen der Warning
+	 * @param distance Abstand zwischen Zug und Arbeiter
+	 */
+	public void issueWarning (Double distance) {
 		
 		log("Warning (d<3): " + (new DecimalFormat("#0.00")).format(distance) + " at " + DateTimeFormatter.ofPattern("HH:mm:ss").format(LocalTime.now()));
 		acknowledgeWarningButton.setEnabled(true);		
@@ -258,16 +270,23 @@ public class SimpleReactiveTrainAlarm {
 		acknowledgeWarningButton.setOpaque(true);
 		acknowledgeWarningButton.setBorderPainted(false);;
 		
-		java.awt.Toolkit.getDefaultToolkit().beep();
 	}
 	
+	/**
+	 * Anhängen von Text am Log-Fenster 
+	 * @param logText Anzuhängender Text 
+	 */
 	private void log(String logText) {
-		
-		logTextArea.setText(logTextArea.getText() + "\n"  + "[" + DateTimeFormatter.ofPattern("HH:mm:ss").format(LocalTime.now()) + "]: " + logText );
-		
+		logTextArea.append("[" + DateTimeFormatter.ofPattern("HH:mm:ss").format(LocalTime.now()) + "]: " + logText + "\n");
+		logTextArea.setCaretPosition(logTextArea.getDocument().getLength());
 	}
 	
-	private void paintPoint (Position pos, boolean train) {
+	/**
+	 * Visualisierungs-Hilfsfunktion
+	 * @param pos Position des Punkts
+	 * @param isTrain true, wenn Zug
+	 */
+	private void paintPoint (Position pos, boolean isTrain) {
 		
 		
 		dp.getG2d().clearRect(0, 0, dp.getWidth(), dp.getHeight());
@@ -276,7 +295,7 @@ public class SimpleReactiveTrainAlarm {
 		
 
 		
-		if (train) {
+		if (isTrain) {
 			
 			paintRectangle(pos, lastPositionWorker, Color.red, false);
 			
@@ -300,11 +319,21 @@ public class SimpleReactiveTrainAlarm {
 		}
 	}
 	
+	/**
+	 * Visualisierungs-Hilfsfunktion
+	 * @param pos Position erstes Objekt
+	 * @param pos2 Position zweites Objekt
+	 * @param col Farbe des ersten Objekts
+	 * @param isWorker true, wenn Arbeiter
+	 */
 	private void paintRectangle(Position pos, Position pos2, Color col, boolean isWorker) {
 
 		Dimension d = dp.getSize();
 
 		dp.getG2d().setColor(Color.black);
+		
+		dp.getG2d().drawOval((int)Math.round(1.1* d.width/10.0), (int)Math.round(1.1 * d.height/10.0), (int) Math.round(7.8* d.width/10.0), (int) Math.round(7.8 * d.height/10.0));
+		dp.getG2d().drawOval((int)Math.round(0.9* d.width/10.0), (int)Math.round(0.9 * d.height/10.0), (int) Math.round(8.2* d.width/10.0), (int) Math.round(8.2 * d.height/10.0));
 		
 		double x= pos.getPosition().get(0);
 		double y= pos.getPosition().get(1);
@@ -334,15 +363,6 @@ public class SimpleReactiveTrainAlarm {
 		dp.getG2d().setColor(col);
 		
 		dp.getG2d().fillRect((int)Math.round(x* d.width/10.0)-3, (int)Math.round(y * d.height/10.0)-3, 7, 7);
-		
-		/*Image image;
-		try {
-			image = ImageIO.read(new File("./src/main/java/SimpleReactiveTrainAlarm/train.png"));
-			dp.getG2d().drawImage(image, (int)Math.round(x* d.width/10.0)-3, (int)Math.round(y * d.width/10.0)+3, (int) Math.round(image.getHeight(null)/5.0), (int) Math.round(image.getWidth(null)/5.0), null);
-		} catch (IOException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}*/
 		 
 		
 		double radiusX = 3.0/5.0 * d.width;
@@ -351,11 +371,73 @@ public class SimpleReactiveTrainAlarm {
 		
 		if (isWorker)
 			dp.getG2d().drawOval((int)Math.round(x* d.width/10.0 - radiusX/2.0), (int)Math.round(y * d.height/10.0 - radiusY/2.0), (int) Math.round(radiusX), (int) Math.round(radiusY));
+				
+		
+		
 		
 		dp.repaint();
 	}
 	
-	public static void main(String[] args) {
+	/**
+	 * UI Hilfsfunktion
+	 * @param simpleUI Basis-UI zum Befüllen
+	 */
+	private void setupSimpleUI (JFrame simpleUI) { 
+	
+		GridLayout layout = new GridLayout(3,4,2,2);
+		
+		simpleUI.setLayout(layout);
+		
+		textFieldTrain = new JTextField();
+		buttonStartTrackingTrain = new JButton("Track");
+		buttonStopTrackingTrain = new JButton("Untrack");
+		simpleUI.add(new JLabel("Train"));
+		simpleUI.add(textFieldTrain);
+		simpleUI.add(buttonStartTrackingTrain);
+		simpleUI.add(buttonStopTrackingTrain);
+		
+	
+		textFieldWorker = new JTextField();
+		buttonStartTrackingWorker = new JButton("Track");
+		buttonStopTrackingWorker = new JButton("Untrack");
+		simpleUI.add(new JLabel("Worker"));
+		simpleUI.add(textFieldWorker);
+		simpleUI.add(buttonStartTrackingWorker);
+		simpleUI.add(buttonStopTrackingWorker);
+		
+		textFieldDistance = new JTextField();
+		acknowledgeWarningButton = new JButton("Acknowledge Warning");
+		buttonComputeDistance = new JButton("Compute");
+		acknowledgeWarningButton.setEnabled(false);
+		simpleUI.add(new JLabel("Distance"));
+		simpleUI.add(textFieldDistance);
+		simpleUI.add(buttonComputeDistance);
+		simpleUI.add(acknowledgeWarningButton);
+	}
+	
+	/**
+	 * UI Hilfsfunktion 
+	 * @param logUI Basis-UI zum Befüllen
+	 */
+	private void setupLogUI (JFrame logUI) {
+		logUI.setLayout(new GridLayout());
+		
+		logTextArea = new JTextArea();
+		JScrollPane scrollPane = new JScrollPane(logTextArea);
+		logUI.add(scrollPane);
+	}
+	
+	/** 
+	 * UI Hilfsfunktion
+	 * @param visualizationUI Basis-UI zum Befüllen
+	 */
+	private void setupVisualizationUI (JFrame visualizationUI) {
+		visualizationUI.setLayout(new GridLayout(1, 1, 5, 5));
+		dp = new DrawingPanel();
+		visualizationUI.add(dp);
+	}
+	
+	public static void main(String[] args) { 
 		new SimpleReactiveTrainAlarm();
 	}
 

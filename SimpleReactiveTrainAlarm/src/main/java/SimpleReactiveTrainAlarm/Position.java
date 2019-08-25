@@ -33,12 +33,17 @@ public class Position {
 			this.pos[i] = position.get(i);		
 	}
 	
+	public void setPosition(double x, double y){
+		pos[0] = x;
+		pos[1] = y;
+	}
+	
 	public String toString() { 
 		DecimalFormat f = new DecimalFormat("#0.00");
 		return "[" + f.format(pos[0]) + " - " + f.format(pos[1]) + "]";
 	}
 	
-	public double distance (Position position2) {
+	public double computeEuclideanDistanceFrom (Position position2) {
 		double distance = 0.0;
 		
 		for (int i=0; i<2; i++)

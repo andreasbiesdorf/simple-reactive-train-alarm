@@ -4,7 +4,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
-public class RandomPositionGenerator {
+public class WorkerPositionGenerator {
 	
 	List<PositionUpdateListener> listeners = new LinkedList<PositionUpdateListener>();
 	
@@ -13,7 +13,7 @@ public class RandomPositionGenerator {
 	String type = "";
 	
 	
-	public RandomPositionGenerator(String type) {
+	public WorkerPositionGenerator(String type) {
 		this.type = type;
 	}
 	
@@ -29,8 +29,6 @@ public class RandomPositionGenerator {
 		
 		if(!running) { 
 			running = true;
-			
-			System.out.println(type + " started to move");
 		
 			new Thread(() -> {
 			
